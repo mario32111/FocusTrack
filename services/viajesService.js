@@ -1,4 +1,5 @@
 const { db } = require('../fire');
+const uploadService = require('./uploadService');
 
 const COLLECTION = 'viajes';
 const SUB_COLLECTION = 'eventos_viaje';
@@ -105,14 +106,98 @@ const eliminarViaje = async (id) => {
 // ========================
 
 /**
- * Agregar un evento a un viaje
+ * Crear un evento en un viaje.
+ * Soporta todos los tipos: IMU, BPM e IA.
+ * 
+ * Para tipo "IA" (reconocimiento facial):
+ *   - data.detecciones: JSON string o array de [{ etiqueta: string, confianza: float }, ...]
+ *   - file: Archivo de multer (imagen de evidencia) - opcional.
+ * 
+ * Para tipo "IMU":
+ *   - data.datos: { acc_x, acc_y, acc_z, gyro_x, es_brusco }
+ * 
+ * Para tipo "BPM":
+ *   - data.datos: { pulsaciones }
+ *
+ * @param {string}       idViaje  - ID del viaje.
+ * @param {Object}       data     - Datos del evento (incluye tipo).
+ * @param {Object|null}  file     - Archivo de multer (solo para tipo IA).
+ * @returns {Object}              - Evento creado.
  */
-const crearEventoViaje = async (idViaje, data) => {
-    const eventoData = {
-        timestamp: data.timestamp || new Date(),
-        tipo: data.tipo, // "IMU", "IA", "BPM"
-        datos: data.datos, // Mapa dinámico según el tipo
-    };
+const crearEventoViaje = async (idViaje, data, file = null) => {
+    // Validar que el viaje existe
+    const viajeDoc = await db.collection(COLLECTION).doc(idViaje).get();
+    if (!viajeDoc.exists) {
+        throw new Error('Viaje no encontrado');
+    }
+
+    const tipo = data.tipo;
+    if (!tipo) {
+        throw new Error('El campo "tipo" es requerido (IMU, IA, BPM).');
+    }
+
+    let eventoData;
+
+    if (tipo === 'IA') {
+        // ---- Procesamiento especial para IA ----
+
+        // Parsear detecciones (puede venir como JSON string desde FormData)
+        let detecciones;
+        try {
+            detecciones = typeof data.detecciones === 'string'
+                ? JSON.parse(data.detecciones)
+                : data.detecciones;
+        } catch (e) {
+            throw new Error('El campo "detecciones" debe ser un JSON válido con formato: [{ etiqueta, confianza }, ...]');
+        }
+
+        // Validar estructura
+        if (!Array.isArray(detecciones) || detecciones.length === 0) {
+            throw new Error('Debe incluir al menos una detección en el array "detecciones".');
+        }
+
+        for (const det of detecciones) {
+            if (!det.etiqueta || det.confianza === undefined) {
+                throw new Error('Cada detección debe tener "etiqueta" (string) y "confianza" (float).');
+            }
+        }
+
+        // Subir imagen de evidencia a Firebase Storage
+        let pathEvidencia = null;
+        if (file) {
+            pathEvidencia = await uploadService.subirArchivo(file, `evidencias_ia/${idViaje}`);
+        }
+
+        eventoData = {
+            timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+            tipo: 'IA',
+            datos: {
+                detecciones: detecciones.map((det) => ({
+                    etiqueta: det.etiqueta,
+                    confianza: parseFloat(det.confianza),
+                })),
+                path_evidencia: pathEvidencia,
+            },
+        };
+    } else {
+        // ---- IMU, BPM u otros tipos ----
+
+        // Si datos viene como string (FormData), parsearlo
+        let datos;
+        try {
+            datos = typeof data.datos === 'string'
+                ? JSON.parse(data.datos)
+                : data.datos;
+        } catch (e) {
+            throw new Error('El campo "datos" debe ser un JSON válido.');
+        }
+
+        eventoData = {
+            timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+            tipo: tipo,
+            datos: datos,
+        };
+    }
 
     const docRef = await db
         .collection(COLLECTION)

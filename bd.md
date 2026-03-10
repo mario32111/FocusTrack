@@ -67,7 +67,7 @@ Agrupa cronológicamente los datos de sensores e IA para facilitar la correlaci�
 * **`tipo`**: Categoría del registro (`"IMU"`, `"IA"`, `"BPM"`).
 * **`datos`**: Mapa de valores según el tipo:
   * [cite_start]**IMU**: `{acc_x, acc_y, acc_z, gyro_x, es_brusco: boolean}`[cite: 10, 16].
-  * [cite_start]**IA**: `{etiqueta: string, confianza: float, path_evidencia: string}`[cite: 15].
+  * **IA**: `{detecciones: [{etiqueta: string, confianza: float}, ...], path_evidencia: string}` — Array de 1 a 6 hábitos detectados por el modelo de reconocimiento facial, cada uno con su nivel de confianza. La imagen de evidencia se almacena en Firebase Storage[cite: 15].
   * [cite_start]**BPM**: `{pulsaciones: integer}`[cite: 6].
 
 ### `alertas_criticas`

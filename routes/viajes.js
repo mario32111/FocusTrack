@@ -1,6 +1,20 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const viajesService = require('../services/viajesService');
+
+// Configurar multer en memoria (sin guardar en disco)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // Máximo 10 MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Solo se permiten archivos de imagen.'), false);
+        }
+    },
+});
 
 // ========================
 // VIAJES
@@ -83,13 +97,21 @@ router.delete('/:id', async (req, res) => {
 // EVENTOS DE VIAJE (Sub-colección)
 // ========================
 
-// POST /viajes/:idViaje/eventos - Crear evento en un viaje
-router.post('/:idViaje/eventos', async (req, res) => {
+// POST /viajes/:idViaje/eventos - Crear evento en un viaje (IMU, BPM o IA)
+// multer procesa FormData si se envía archivo; si no, pasa sin problema.
+router.post('/:idViaje/eventos', upload.single('evidencia'), async (req, res) => {
     try {
-        const evento = await viajesService.crearEventoViaje(req.params.idViaje, req.body);
+        const evento = await viajesService.crearEventoViaje(
+            req.params.idViaje,
+            req.body,    // contiene "tipo" + campos según el tipo
+            req.file     // archivo de imagen (solo para tipo IA, null en otros)
+        );
         res.status(201).json(evento);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        if (error.message === 'Viaje no encontrado') {
+            return res.status(404).json({ error: error.message });
+        }
+        res.status(400).json({ error: error.message });
     }
 });
 
