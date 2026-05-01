@@ -88,3 +88,8 @@
 - `id_usuario`: String
 - `ultima_conexion`: Timestamp
 - `modelo_hardware`: String
+
+
+### Comando para agregar un nuevo usuario al broker
+docker run --rm -v "${PWD}:/mosquitto/config" eclipse-mosquitto sh -c "mosquitto_passwd -b /mosquitto/config/mosquitto.passwd juanito hola123"
+

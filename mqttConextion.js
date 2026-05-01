@@ -13,7 +13,7 @@ function conectionMqtt() {
     console.log('Conectado al broker MQTT');
 
     // Suscribirse al tema "casa/sala/temperatura"
-    const topic = 'carro/sensores';
+    const topic = 'carro/sensores/#';
     mqttClient.subscribe(topic, (err) => {
       if (err) {
         console.error('Error al suscribirse al tema:', err);
