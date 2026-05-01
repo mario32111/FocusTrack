@@ -14,6 +14,7 @@ var conductoresRouter = require('./routes/conductores');
 var viajesRouter = require('./routes/viajes');
 var alertasRouter = require('./routes/alertas');
 var dispositivosRouter = require('./routes/dispositivos');
+var mqttRouter = require('./routes/mqtt');
 
 var app = express();
 
@@ -38,6 +39,7 @@ app.use('/conductores', conductoresRouter);
 app.use('/viajes', viajesRouter);
 app.use('/alertas', alertasRouter);
 app.use('/dispositivos', dispositivosRouter);
+app.use('/mqtt', mqttRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
