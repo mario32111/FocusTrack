@@ -2,7 +2,11 @@ const mqtt = require("mqtt");
 
 // Configurar MQTT
 const brokerUrl = 'mqtt://mosquitto:1883'; // Cambia por tu broker
-const mqttClient = mqtt.connect(brokerUrl);
+const options = {
+  username: 'mario',
+  password: 'admin123'
+};
+const mqttClient = mqtt.connect(brokerUrl, options);
 
 function conectionMqtt() {
   mqttClient.on('connect', () => {

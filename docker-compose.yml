@@ -26,6 +26,9 @@ services:
       - "8000:8000"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto.passwd:/tmp/mosquitto.passwd
+    # Este comando copia el archivo de contraseña a una ruta interna para evitar problemas de permisos de Windows con Docker
+    command: sh -c "cp /tmp/mosquitto.passwd /mosquitto/config/mosquitto.passwd && chown mosquitto:mosquitto /mosquitto/config/mosquitto.passwd && /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
     networks:
       - my_network
 
