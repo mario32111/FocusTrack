@@ -23,12 +23,14 @@ services:
     container_name: mosquitto_broker
     ports:
       - "1883:1883"
+      - "8883:8883"
       - "8000:8000"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
       - ./mosquitto.passwd:/tmp/mosquitto.passwd
-    # Este comando copia el archivo de contraseña a una ruta interna para evitar problemas de permisos de Windows con Docker
-    command: sh -c "cp /tmp/mosquitto.passwd /mosquitto/config/mosquitto.passwd && chown mosquitto:mosquitto /mosquitto/config/mosquitto.passwd && /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+      - ./certs:/tmp/certs
+    # Este comando copia los archivos montados a una ruta interna para evitar problemas de permisos de Windows con Docker
+    command: sh -c "cp /tmp/mosquitto.passwd /mosquitto/config/mosquitto.passwd && chown mosquitto:mosquitto /mosquitto/config/mosquitto.passwd && cp -r /tmp/certs /mosquitto/config/certs && chown -R mosquitto:mosquitto /mosquitto/config/certs && /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
     networks:
       - my_network
 

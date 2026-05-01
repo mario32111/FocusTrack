@@ -93,3 +93,7 @@
 ### Comando para agregar un nuevo usuario al broker
 docker run --rm -v "${PWD}:/mosquitto/config" eclipse-mosquitto sh -c "mosquitto_passwd -b /mosquitto/config/mosquitto.passwd juanito hola123"
 
+
+### Comando para generar certificados autofirmados
+
+docker run --rm -v "${PWD}:/workspace" -w /workspace node:18-alpine sh -c "apk add --no-cache openssl && mkdir -p certs && cd certs && openssl genrsa -out ca.key 2048 && openssl req -new -x509 -days 3650 -key ca.key -out ca.crt -subj '/CN=FocusTrackCA' && openssl genrsa -out server.key 2048 && openssl req -new -key server.key -out server.csr -subj '/CN=192.168.1.72' && openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650"

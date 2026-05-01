@@ -41,5 +41,13 @@ coverage/
 *.tmp
 *.bak
 
+# Docker / Seguridad
+mosquitto.passwd
+
 # Archivos de ejemplo o temporales del proyecto
 ejemploProfe.js
+
+# Certificados de seguridad (NUNCA subir llaves privadas a Git)
+certs/
+*.key
+*.csr

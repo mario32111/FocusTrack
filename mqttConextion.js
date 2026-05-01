@@ -1,10 +1,14 @@
 const mqtt = require("mqtt");
+const fs = require("fs");
+const path = require("path");
 
-// Configurar MQTT
-const brokerUrl = 'mqtt://mosquitto:1883'; // Cambia por tu broker
+// Configurar MQTT con TLS (MQTTS)
+const brokerUrl = 'mqtts://mosquitto:8883'; // Usar mqtts y puerto 8883
 const options = {
   username: 'mario',
-  password: 'admin123'
+  password: 'admin123',
+  rejectUnauthorized: false, // Opcional para certificados autofirmados
+  ca: [fs.readFileSync(path.join(__dirname, 'certs', 'ca.crt'))] // Cargar el certificado CA
 };
 const mqttClient = mqtt.connect(brokerUrl, options);
 
