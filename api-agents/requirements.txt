@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+pyautogen
+firebase-admin
+paho-mqtt

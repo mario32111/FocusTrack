@@ -1,6 +1,15 @@
 # Dependencies
 node_modules/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.env_python/
+
 # Environment variables
 .env
 .env.local
@@ -51,3 +60,4 @@ ejemploProfe.js
 certs/
 *.key
 *.csr
+mosquitto.acl

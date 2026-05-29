@@ -3,12 +3,12 @@ version: '3.8'
 services:
   my_api:
     image: focustrack_api:latest
-    build: .
+    build: ./backend-main
     container_name: focustrack-backend-api
     ports:
       - "3000:3000"
     volumes:
-      - .:/usr/src/app
+      - ./backend-main:/usr/src/app
       - /usr/src/app/node_modules
     networks:
       - my_network
@@ -18,6 +18,37 @@ services:
       - NODE_ENV=development
       - PORT=3000
 
+  api_detection:
+    build: ./api-detection
+    container_name: focustrack-api-detection
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./api-detection:/app
+    networks:
+      - my_network
+
+  api_maniobras:
+    build: ./api-maniobras
+    container_name: focustrack-api-maniobras
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./api-maniobras:/app
+    networks:
+      - my_network
+
+  api_agents:
+    build: ./api-agents
+    container_name: focustrack-api-agents
+    ports:
+      - "8003:8000"
+    volumes:
+      - ./api-agents:/app
+      - ./backend-main/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    networks:
+      - my_network
+
   mosquitto:
     image: eclipse-mosquitto
     container_name: mosquitto_broker
@@ -26,9 +57,9 @@ services:
       - "8883:8883"
       - "8000:8000"
     volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
-      - ./mosquitto.passwd:/tmp/mosquitto.passwd
-      - ./certs:/tmp/certs
+      - ./backend-main/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./backend-main/mosquitto.passwd:/tmp/mosquitto.passwd
+      - ./backend-main/certs:/tmp/certs
     # Este comando copia los archivos montados a una ruta interna para evitar problemas de permisos de Windows con Docker
     command: sh -c "cp /tmp/mosquitto.passwd /mosquitto/config/mosquitto.passwd && chown mosquitto:mosquitto /mosquitto/config/mosquitto.passwd && cp -r /tmp/certs /mosquitto/config/certs && chown -R mosquitto:mosquitto /mosquitto/config/certs && /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
     networks:
