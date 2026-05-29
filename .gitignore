@@ -9,6 +9,7 @@ venv/
 env/
 .venv/
 .env_python/
+.cache/
 
 # Environment variables
 .env

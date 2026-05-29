@@ -46,6 +46,8 @@ services:
     volumes:
       - ./api-agents:/app
       - ./backend-main/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    env_file:
+      - ./api-agents/.env
     networks:
       - my_network
 
