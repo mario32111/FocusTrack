@@ -2,7 +2,7 @@ import os
 import numpy as np
 import joblib
 import pandas as pd
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI(title="API Maniobras")
@@ -11,10 +11,10 @@ MODEL_PATH = os.path.join(os.path.dirname(__file__), "modelo_conduccion_97.pkl")
 modelo = joblib.load(MODEL_PATH)
 
 CLASS_NAMES = {
-    1: "Conducción normal",
-    2: "Frenado brusco",
-    3: "Aceleración brusca",
-    4: "Giro brusco",
+    1: "Aceleración brusca",
+    2: "Giro brusco a la derecha",
+    3: "Giro brusco a la izquierda",
+    4: "Frenado brusco",
 }
 
 class SensorReading(BaseModel):
@@ -48,7 +48,7 @@ def health():
 @app.post("/predict")
 def predict(batch: SensorBatch):
     if len(batch.readings) < 1:
-        return {"error": "Se necesitan al menos 1 lectura de sensores"}
+        raise HTTPException(status_code=400, detail="Se necesitan al menos 1 lectura de sensores")
 
     readings = [r.model_dump() for r in batch.readings]
     df_features = feature_engineering(readings)
@@ -59,26 +59,45 @@ def predict(batch: SensorBatch):
         "AccY_mean", "AccY_std", "AccZ_mean", "AccZ_std",
         "Acc_Mag_mean", "Acc_Mag_std",
     ]
-    X = df_features[feature_cols].values
-    predicciones = modelo.predict(X)
-    probabilidades = modelo.predict_proba(X)
-    resultados = []
-    for i, (pred, proba) in enumerate(zip(predicciones, probabilidades)):
-        resultados.append({
-            "indice": i,
-            "clase": int(pred),
-            "maniobra": CLASS_NAMES.get(int(pred), "Desconocida"),
-            "confianza": round(float(max(proba)) * 100, 2),
-        })
-    return {
-        "total": len(resultados),
-        "resultados": resultados,
-    }
+    X = df_features[feature_cols]
+    
+    if X.empty:
+        raise HTTPException(status_code=400, detail="DataFrame de características vacío después de feature engineering.")
+
+    try:
+        print(f"DEBUG: X shape for predict: {X.shape}")
+        if not X.empty:
+            print(f"DEBUG: Primeras filas de X para predict:\n{X.head()}")
+        
+        predicciones = modelo.predict(X)
+        probabilidades = modelo.predict_proba(X)
+        
+        print(f"DEBUG: Predicciones: {predicciones}")
+        print(f"DEBUG: Probabilidades: {probabilidades}")
+        
+        resultados = []
+        for i, (pred, proba) in enumerate(zip(predicciones, probabilidades)):
+            resultados.append({
+                "indice": i,
+                "clase": int(pred),
+                "maniobra": CLASS_NAMES.get(int(pred), "Desconocida"),
+                "confianza": round(float(max(proba)) * 100, 2),
+            })
+        return {
+            "total": len(resultados),
+            "resultados": resultados,
+        }
+    except Exception as e:
+        print(f"ERROR en predict: {e}")
+        print(f"DEBUG: Shape de X antes del error en predict: {X.shape}")
+        if not X.empty:
+            print(f"DEBUG: Primeras filas de X:\n{X.head()}")
+        raise HTTPException(status_code=500, detail=f"Error al realizar la predicción: {e}")
 
 @app.post("/predict-latest")
 def predict_latest(batch: SensorBatch):
     if len(batch.readings) < 1:
-        return {"error": "Se necesitan al menos 1 lectura de sensores"}
+        raise HTTPException(status_code=400, detail="Se necesitan al menos 1 lectura de sensores")
 
     readings = [r.model_dump() for r in batch.readings]
     df_features = feature_engineering(readings)
@@ -89,16 +108,74 @@ def predict_latest(batch: SensorBatch):
         "AccY_mean", "AccY_std", "AccZ_mean", "AccZ_std",
         "Acc_Mag_mean", "Acc_Mag_std",
     ]
-    X = df_features[feature_cols].values
-    pred = modelo.predict(X[-1:])
-    proba = modelo.predict_proba(X[-1:])
-    clase = int(pred[0])
-    return {
-        "clase": clase,
-        "maniobra": CLASS_NAMES.get(clase, "Desconocida"),
-        "confianza": round(float(max(proba[0])) * 100, 2),
-        "todas_las_probabilidades": {
-            CLASS_NAMES.get(i + 1, f"Clase {i + 1}"): round(float(p) * 100, 2)
-            for i, p in enumerate(proba[0])
-        },
-    }
+    X = df_features[feature_cols]
+    
+    if X.empty:
+        raise HTTPException(status_code=400, detail="DataFrame de características vacío después de feature engineering.")
+
+    try:
+        print(f"DEBUG: X shape for predict-latest: {X.shape}")
+        if not X.empty:
+            print(f"DEBUG: Primeras filas de X para predict-latest:\n{X.head()}")
+        
+        pred = modelo.predict(X[-1:])
+        proba = modelo.predict_proba(X[-1:])
+        
+        print(f"DEBUG: pred result: {pred}")
+        print(f"DEBUG: proba result: {proba}")
+        
+        clase = int(pred[0])
+        return {
+            "clase": clase,
+            "maniobra": CLASS_NAMES.get(clase, "Desconocida"),
+            "confianza": round(float(max(proba[0])) * 100, 2),
+            "todas_las_probabilidades": {
+                CLASS_NAMES.get(i + 1, f"Clase {i + 1}"): round(float(p) * 100, 2)
+                for i, p in enumerate(proba[0])
+            },
+        }
+    except Exception as e:
+        print(f"ERROR en predict-latest: {e}")
+        print(f"DEBUG: Shape de X antes del error en predict-latest: {X.shape}")
+        if not X.empty:
+            print(f"DEBUG: Primeras filas de X:\n{X.head()}")
+        raise HTTPException(status_code=500, detail=f"Error al realizar la predicción: {e}")
+
+@app.post("/predict-latest")
+def predict_latest(batch: SensorBatch):
+    if len(batch.readings) < 1:
+        raise HTTPException(status_code=400, detail="Se necesitan al menos 1 lectura de sensores")
+
+    readings = [r.model_dump() for r in batch.readings]
+    df_features = feature_engineering(readings)
+    feature_cols = [
+        "GyroX", "GyroY", "GyroZ", "AccX", "AccY", "AccZ", "Acc_Mag",
+        "GyroX_mean", "GyroX_std", "GyroY_mean", "GyroY_std",
+        "GyroZ_mean", "GyroZ_std", "AccX_mean", "AccX_std",
+        "AccY_mean", "AccY_std", "AccZ_mean", "AccZ_std",
+        "Acc_Mag_mean", "Acc_Mag_std",
+    ]
+    X = df_features[feature_cols]
+    
+    if X.empty:
+        raise HTTPException(status_code=400, detail="DataFrame de características vacío después de feature engineering.")
+
+    try:
+        pred = modelo.predict(X[-1:])
+        proba = modelo.predict_proba(X[-1:])
+        clase = int(pred[0])
+        return {
+            "clase": clase,
+            "maniobra": CLASS_NAMES.get(clase, "Desconocida"),
+            "confianza": round(float(max(proba[0])) * 100, 2),
+            "todas_las_probabilidades": {
+                CLASS_NAMES.get(i + 1, f"Clase {i + 1}"): round(float(p) * 100, 2)
+                for i, p in enumerate(proba[0])
+            },
+        }
+    except Exception as e:
+        print(f"ERROR en predict-latest: {e}")
+        print(f"Shape de X antes del error en predict-latest: {X.shape}")
+        if not X.empty:
+            print(f"Primeras filas de X:\n{X.head()}")
+        raise HTTPException(status_code=500, detail=f"Error al realizar la predicción: {e}")
