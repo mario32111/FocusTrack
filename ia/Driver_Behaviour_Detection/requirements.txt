@@ -1,0 +1,15 @@
+opencv-python
+numpy
+tqdm
+Pillow
+torch
+torchvision
+matplotlib
+ultralytics
+anvil-uplink
+ffmpeg-python
+requests
+roboflow
+fastapi
+uvicorn
+python-multipart

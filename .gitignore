@@ -1,26 +1,6 @@
-# Dependencies
-node_modules/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-env/
-.venv/
-.env_python/
-.cache/
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-
+# ==============================================================================
+# GLOBAL (OS, Editor, Entorno, Logs)
+# ==============================================================================
 # OS files
 Thumbs.db
 .DS_Store
@@ -31,34 +11,95 @@ Thumbs.db
 *.swp
 *.swo
 
-# Firebase Config & Keys
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env_python/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
 firebase-debug.log
+
+# ==============================================================================
+# BACKEND (Node.js, Docker, Firebase, Mosquitto, Seguridad)
+# ==============================================================================
+# Dependencies
+node_modules/
+
+# Build & Coverage
+dist/
+build/
+coverage/
+
+# Firebase Config & Keys
 .firebase/
 serviceAccountKey.json
 fire.js
 
-# Uploads
+# Uploads & Assets
 uploads/
 
-# Build output
-dist/
-build/
-
-# Coverage
-coverage/
-
-# Misc
-*.tmp
-*.bak
-
-# Docker / Seguridad
+# Docker / Mosquitto
 mosquitto.passwd
-
-# Archivos de ejemplo o temporales del proyecto
-ejemploProfe.js
+mosquitto.acl
 
 # Certificados de seguridad (NUNCA subir llaves privadas a Git)
 certs/
 *.key
 *.csr
-mosquitto.acl
+
+# ==============================================================================
+# IA (Python, Jupyter, PyTorch, Machine Learning)
+# ==============================================================================
+# Python / Entornos
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.cache/
+
+# Jupyter / Notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# Modelos y Datasets (PyTorch, Scikit-Learn, YOLO, etc.)
+*.pt
+*.pth
+*.onnx
+*.pkl
+*.h5
+*.csv
+dataset/
+datasets/
+data/
+models/
+PTA*/
+
+# Resultados de entrenamiento y logs
+runs/
+wandb/
+imgs/
+
+# ==============================================================================
+# IOT (Arduino, PlatformIO, ESP32, Rasp)
+# ==============================================================================
+.pio/
+.pioenvs/
+.piolibdeps/
+*.bin
+*.elf
+*.hex
+*.a
+*.o
+
+# ==============================================================================
+# MISC / TEMPORALES
+# ==============================================================================
+*.tmp
+*.bak
+ejemploProfe.js
