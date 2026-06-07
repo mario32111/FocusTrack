@@ -45,7 +45,7 @@ services:
       - "8003:8000"
     volumes:
       - ./api-agents:/app
-      - ./backend-main/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+      - ./backend-main/certs:/app/certs:ro
     env_file:
       - ./api-agents/.env
     networks:

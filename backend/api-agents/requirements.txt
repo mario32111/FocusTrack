@@ -1,5 +1,6 @@
 fastapi
 uvicorn
 pyautogen==0.2.35
-firebase-admin
 paho-mqtt
+python-dotenv
+requests

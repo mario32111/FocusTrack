@@ -21,7 +21,7 @@ const crearUsuario = async (data) => {
     };
 
     await db.collection(COLLECTION).doc(userRecord.uid).set(userData);
-
+    
     return { id_usuario: userRecord.uid, ...userData };
 };
 

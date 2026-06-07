@@ -2,7 +2,7 @@ import cv2
 from ultralytics import YOLO
 
 # Carga el modelo (best2.pt es el que terminó con mejores métricas en Colab)
-model = YOLO('best2.pt')
+model = YOLO('driver_behaviour_v1.pt')
 
 # Prueba con 1 o 0 según tu cámara
 cap = cv2.VideoCapture(0)
