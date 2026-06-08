@@ -29,6 +29,27 @@ router.post("/publish", (req, res) => {
   });
 });
 
+// Nuevo endpoint para publicar comandos a actuadores
+router.post("/publish-actuator", (req, res) => {
+  const { id_dispositivo, comando } = req.body;
+
+  if (!id_dispositivo || !comando) {
+    return res.status(400).json({ error: "Por favor, proporciona 'id_dispositivo' y 'comando'" });
+  }
+
+  const topic = `carro/actuadores/${id_dispositivo}`;
+  const message = JSON.stringify(comando);
+
+  mqttClient.publish(topic, message, (err) => {
+    if (err) {
+      console.error("Error al publicar actuador:", err);
+      return res.status(500).json({ error: "No se pudo publicar el comando" });
+    }
+    console.log(`Comando enviado al dispositivo ${id_dispositivo}: ${message}`);
+    res.status(200).json({ message: "Comando enviado con éxito" });
+  });
+});
+
 // Simulación de sensor que publica un mensaje cada segundo
 router.get("/simulate-sensor", (req, res) => {
   let count = 0;

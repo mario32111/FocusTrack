@@ -1,12 +1,28 @@
 import os
-from autogen import ConversableAgent
+import json
+from typing import Annotated
+from autogen import ConversableAgent, register_function
 from api_client import (
     get_viaje, get_conductor, get_detecciones_ia,
-    get_alertas_viaje, get_bpm
+    get_alertas_viaje, get_bpm, trigger_actuator
 )
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 config_list = [{"model": "openrouter/auto", "base_url": "https://openrouter.ai/api/v1", "api_key": OPENROUTER_API_KEY}]
+
+# --- HERRAMIENTAS DE ACTUACIÓN ---
+
+def activar_vibrador(id_dispositivo: Annotated[str, "ID del dispositivo IoT"], duracion_ms: Annotated[int, "Duración en ms"]) -> str:
+    """Activa el vibrador del dispositivo IoT."""
+    comando = {"accion": "vibrar", "parametros": {"duracion_ms": duracion_ms}}
+    trigger_actuator(id_dispositivo, comando)
+    return "Vibrador activado"
+
+def activar_led(id_dispositivo: Annotated[str, "ID del dispositivo IoT"], color: Annotated[str, "Color (rojo, verde, azul)"]) -> str:
+    """Cambia el color del LED RGB del dispositivo IoT."""
+    comando = {"accion": "led", "parametros": {"color": color}}
+    trigger_actuator(id_dispositivo, comando)
+    return f"LED activado en color {color}"
 
 def evaluate_crisis(alert_data):
     id_viaje = alert_data.get("id_viaje")
@@ -19,75 +35,41 @@ def evaluate_crisis(alert_data):
     detections = get_detecciones_ia(id_viaje)
     alerts = get_alertas_viaje(id_viaje)
     heart_rate = get_bpm(id_viaje)
+    
+    # Obtener id_dispositivo (asumiendo que está en el conductor)
+    id_dispositivo = driver.get("id_dispositivo", "ESP32_DEFAULT")
 
-    # Procesar detecciones
-    all_detections = []
-    for ev in detections:
-        datos = ev.get("datos", {})
-        det_list = datos.get("detecciones", [])
-        for d in det_list:
-            all_detections.append(d.get('etiqueta'))
+    # Procesar datos para el contexto...
+    context = f"""ALERTA CRÍTICA: {alert_data.get('descripcion')}
+Viaje: {id_viaje}
+Conductor: {driver.get('nombre_completo', 'Desconocido')}
+Riesgo: {viaje.get('score_final_viaje')}"""
 
-    # Procesar BPM
-    bpm_values = []
-    for ev in heart_rate[-5:]:  # últimos 5
-        bpm = ev.get("datos", {}).get("pulsaciones")
-        if bpm:
-            bpm_values.append(bpm)
-
-    context = f"""ALERTA CRÍTICA RECIBIDA:
-Tipo: {alert_data.get('tipo_alerta')}
-Nivel: {alert_data.get('nivel_riesgo')}
-Descripción: {alert_data.get('descripcion')}
-
-CONDUCTOR:
-Nombre: {driver.get('nombre_completo') if driver else 'Desconocido'}
-Contacto emergencia: {driver.get('contacto_emergencia') if driver else 'No registrado'}
-
-VIAJE:
-Duración: {viaje.get('hora_inicio')} - {viaje.get('hora_fin')}
-Riesgo actual: {viaje.get('score_final_viaje')}
-
-DETECCIONES RECIENTES: {all_detections[-5:] if all_detections else 'Ninguna'}
-HISTORIAL ALERTAS: {len(alerts)} alertas en este viaje
-BPM RECIENTE: {bpm_values}"""
-
-    evaluator = ConversableAgent(
-        name="EvaluadorSeguridad",
+    # Agentes (Evaluador, Logistica, Comunicador)
+    assistant = ConversableAgent(
+        name="EvaluadorCrisis",
+        system_message=f"""Eres el evaluador de crisis.
+Analiza la alerta y decide las acciones físicas.
+Tienes acceso a las herramientas: `activar_vibrador` y `activar_led`.
+Si el riesgo es alto, activa el led rojo y el vibrador inmediatamente.
+Al terminar, responde TERMINAR.""",
         llm_config={"config_list": config_list, "temperature": 0.2},
-        system_message="Evalúa la severidad de la alerta basada en el contexto. Responde con: CRITICO, ALTO, MEDIO o BAJO. Justifica en 1 oración.",
         human_input_mode="NEVER",
+        is_termination_msg=lambda msg: "TERMINAR" in (msg.get("content") or "").upper(),
     )
 
-    logistics = ConversableAgent(
-        name="Logistica",
-        llm_config={"config_list": config_list, "temperature": 0.3},
-        system_message="Evalúa opciones de acción: detenerse, continuar, desviar. Recomienda la más segura.",
+    user_proxy = ConversableAgent(
+        name="UsuarioProxy",
+        system_message="Ejecutas herramientas.",
         human_input_mode="NEVER",
+        llm_config=False,
+        is_termination_msg=lambda msg: "TERMINAR" in (msg.get("content") or "").upper(),
     )
 
-    communicator = ConversableAgent(
-        name="Comunicador",
-        llm_config={"config_list": config_list, "temperature": 0.5},
-        system_message="Genera mensaje de notificación para el contacto de emergencia y administrador. Sé claro y conciso.",
-        human_input_mode="NEVER",
-    )
+    register_function(activar_vibrador, caller=assistant, executor=user_proxy, name="activar_vibrador")
+    register_function(activar_led, caller=assistant, executor=user_proxy, name="activar_led")
 
-    eval_response = evaluator.initiate_chat(evaluator, message=context, max_turns=1)
-    eval_result = eval_response.chat_history[-1].get("content") if eval_response.chat_history else "Error"
+    # Ejecutar crisis
+    response = user_proxy.initiate_chat(assistant, message=context, max_turns=5)
 
-    log_response = logistics.initiate_chat(logistics, message=f"Evaluación: {eval_result}", max_turns=1)
-    log_result = log_response.chat_history[-1].get("content") if log_response.chat_history else "Error"
-
-    comm_response = communicator.initiate_chat(communicator, message=f"Evaluación: {eval_result}\nAcción: {log_result}", max_turns=1)
-    comm_result = comm_response.chat_history[-1].get("content") if comm_response.chat_history else "Error"
-
-    return {
-        "id_alerta": alert_data.get("id_alerta"),
-        "risk_level": eval_result.split()[0] if eval_result else "DESCONOCIDO",
-        "evaluator_analysis": eval_result,
-        "logistics_assessment": log_result,
-        "notification_message": comm_result,
-        "driver_name": driver.get("nombre_completo") if driver else "Desconocido",
-        "emergency_contact": driver.get("contacto_emergencia") if driver else None
-    }
+    return {"status": "Acción ejecutada", "analisis": response.chat_history[-1].get("content")}

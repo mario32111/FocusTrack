@@ -64,3 +64,15 @@ def buscar_empresa_por_nombre(nombre: str) -> dict:
         if nombre.lower() in emp.get("nombre_empresa", "").lower():
             return {"id_empresa": emp.get("id_empresa"), "nombre_empresa": emp.get("nombre_empresa")}
     return {"error": f"No se encontró ninguna empresa con el nombre '{nombre}'"}
+
+def trigger_actuator(id_dispositivo, comando):
+    """
+    Envía la orden al backend Node.js para que este la publique por MQTT.
+    comando: {"accion": "...", "parametros": {...}}
+    """
+    payload = {
+        "id_dispositivo": id_dispositivo,
+        "comando": comando
+    }
+    return _post("/mqtt/publish-actuator", payload)
+
