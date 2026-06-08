@@ -55,3 +55,12 @@ def get_conductores_empresa(id_empresa):
 
 def get_empresa(id_empresa):
     return _get(f"/empresas/{id_empresa}")
+
+def buscar_empresa_por_nombre(nombre: str) -> dict:
+    """Busca una empresa por su nombre y devuelve su ID e información básica."""
+    empresas = _get("/empresas") or []
+    for emp in empresas:
+        # Búsqueda insensible a mayúsculas
+        if nombre.lower() in emp.get("nombre_empresa", "").lower():
+            return {"id_empresa": emp.get("id_empresa"), "nombre_empresa": emp.get("nombre_empresa")}
+    return {"error": f"No se encontró ninguna empresa con el nombre '{nombre}'"}

@@ -33,12 +33,11 @@ def agent_coach(req: CoachRequest):
 
 class ChatRequest(BaseModel):
     question: str
-    id_empresa: str
 
 @app.post("/agent/chat")
 def agent_chat(req: ChatRequest):
     try:
-        response = chat_with_fleet(req.question, req.id_empresa)
+        response = chat_with_fleet(req.question)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
