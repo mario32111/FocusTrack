@@ -26,6 +26,16 @@ const crearViaje = async (data) => {
         hora_fin: data.hora_fin || null,
         tiempo_estimado: data.tiempo_estimado || null,
         score_final_viaje: data.score_final_viaje || null,
+        coordenadas_inicio: {
+            lat: data.coordenadas_inicio?.lat || null,
+            lng: data.coordenadas_inicio?.lng || null,
+            direccion: data.coordenadas_inicio?.direccion || null,
+        },
+        coordenadas_destino: {
+            lat: data.coordenadas_destino?.lat || null,
+            lng: data.coordenadas_destino?.lng || null,
+            direccion: data.coordenadas_destino?.direccion || null,
+        },
     };
 
     const docRef = await db.collection(COLLECTION).add(viajeData);

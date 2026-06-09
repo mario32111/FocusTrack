@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/sensor_provider.dart';
-import '../providers/auth_provider.dart'; // Importante para el botón de Cerrar Sesión
-
-// ==========================================
-// IMPORTAMOS LAS NUEVAS PANTALLAS
-// ==========================================
+import '../providers/auth_provider.dart';
+import '../models/viaje_model.dart';
+import '../services/viajes_service.dart';
 import 'rutas_screen.dart';
 import 'maniobras_screen.dart';
 import 'puntaje_screen.dart';
+import 'crear_viaje_screen.dart';
 
 class TableroScreen extends StatefulWidget {
   const TableroScreen({super.key});
@@ -18,14 +17,65 @@ class TableroScreen extends StatefulWidget {
 }
 
 class _TableroScreenState extends State<TableroScreen> {
-  bool _isBluetoothConnected = false; // Simulación de estado Bluetooth
+  bool _isBluetoothConnected = false;
+  final ViajesService _viajesService = ViajesService.instance;
+  ViajeModel? _viajeActivo;
+  bool _cargandoViaje = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SensorProvider>().iniciarMonitoreo();
+      _cargarViajeActivo();
     });
+  }
+
+  Future<void> _cargarViajeActivo() async {
+    final auth = context.read<AuthProvider>();
+    final usuario = auth.usuarioActual;
+    if (usuario == null) return;
+
+    try {
+      final viajes = await _viajesService.obtenerViajesPorConductor(usuario.uid);
+      final activo = viajes.where((v) => v.horaFin == null).firstOrNull;
+      setState(() {
+        _viajeActivo = activo;
+        _cargandoViaje = false;
+      });
+    } catch (e) {
+      setState(() => _cargandoViaje = false);
+    }
+  }
+
+  Future<void> _finalizarViaje() async {
+    if (_viajeActivo?.id == null) return;
+
+    try {
+      final sensor = context.read<SensorProvider>();
+      await _viajesService.finalizarViaje(
+        _viajeActivo!.id!,
+        score: sensor.scoreConduccion,
+      );
+      setState(() => _viajeActivo = null);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Viaje finalizado correctamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al finalizar viaje: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -33,10 +83,7 @@ class _TableroScreenState extends State<TableroScreen> {
     return Consumer<SensorProvider>(
       builder: (context, sensor, child) {
         return Scaffold(
-          // Menú lateral que pediste
           drawer: _buildMenuLateral(context),
-          
-          // AppBar transparente para alojar el botón de menú y mantener el diseño
           appBar: AppBar(
             backgroundColor: const Color(0xFF1A1A2E),
             elevation: 0,
@@ -52,7 +99,6 @@ class _TableroScreenState extends State<TableroScreen> {
               ),
             ),
           ),
-          
           body: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -66,6 +112,10 @@ class _TableroScreenState extends State<TableroScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
+                    if (_viajeActivo != null) ...[
+                      _buildViajeActivo(),
+                      const SizedBox(height: 20),
+                    ],
                     _buildBluetoothPanel(),
                     const SizedBox(height: 20),
                     _buildScoreAnimado(sensor),
@@ -84,30 +134,28 @@ class _TableroScreenState extends State<TableroScreen> {
               ),
             ),
           ),
-          
-          // Botón flotante para calibrar sensores
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Calibrando sensores a punto cero...'),
-                  backgroundColor: Colors.cyan,
-                ),
-              );
-              // sensor.calibrarSensores(); // Conectar a tu lógica real
+            onPressed: _viajeActivo != null ? _finalizarViaje : () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CrearViajeScreen()),
+              ).then((_) => _cargarViajeActivo());
             },
-            backgroundColor: const Color(0xFF1E1E1E),
-            icon: const Icon(Icons.explore, color: Colors.cyanAccent),
-            label: const Text("Calibrar", style: TextStyle(color: Colors.white)),
+            backgroundColor: _viajeActivo != null ? Colors.redAccent : Colors.green,
+            icon: Icon(
+              _viajeActivo != null ? Icons.stop : Icons.play_arrow,
+              color: Colors.white,
+            ),
+            label: Text(
+              _viajeActivo != null ? "Finalizar Viaje" : "Iniciar Viaje",
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
           ),
         );
       },
     );
   }
 
-  // ==========================================
-  // MENÚ LATERAL (DRAWER)
-  // ==========================================
   Widget _buildMenuLateral(BuildContext context) {
     return Drawer(
       backgroundColor: const Color(0xFF121212),
@@ -148,13 +196,25 @@ class _TableroScreenState extends State<TableroScreen> {
               padding: const EdgeInsets.symmetric(vertical: 10),
               children: [
                 _menuItem(
+                  icon: Icons.add_location,
+                  color: Colors.green,
+                  title: "Nuevo Viaje",
+                  subtitle: "Crear un nuevo viaje",
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CrearViajeScreen()),
+                    ).then((_) => _cargarViajeActivo());
+                  },
+                ),
+                _menuItem(
                   icon: Icons.route,
                   color: Colors.greenAccent,
-                  title: "Rutas Realizadas",
+                  title: "Mis Rutas",
                   subtitle: "Historial de viajes",
                   onTap: () {
-                    Navigator.pop(context); 
-                    // NAVEGACIÓN DIRECTA
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const RutasScreen()),
@@ -168,7 +228,6 @@ class _TableroScreenState extends State<TableroScreen> {
                   subtitle: "Aceleraciones, frenados, etc.",
                   onTap: () {
                     Navigator.pop(context);
-                    // NAVEGACIÓN DIRECTA
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const ManiobrasScreen()),
@@ -178,11 +237,10 @@ class _TableroScreenState extends State<TableroScreen> {
                 _menuItem(
                   icon: Icons.leaderboard,
                   color: Colors.purpleAccent,
-                  title: "Puntaje y Logros",
+                  title: "Mi Puntaje",
                   subtitle: "Tu ranking global",
                   onTap: () {
                     Navigator.pop(context);
-                    // NAVEGACIÓN DIRECTA
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const PuntajeScreen()),
@@ -232,9 +290,105 @@ class _TableroScreenState extends State<TableroScreen> {
     );
   }
 
-  // ==========================================
-  // COMPONENTES DEL TABLERO
-  // ==========================================
+  Widget _buildViajeActivo() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orangeAccent.withOpacity(0.15),
+            blurRadius: 15,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.play_circle, color: Colors.orangeAccent, size: 24),
+              SizedBox(width: 10),
+              Text(
+                "VIAJE EN CURSO",
+                style: TextStyle(
+                  color: Colors.orangeAccent,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          if (_viajeActivo!.latInicio != null && _viajeActivo!.latDestino != null)
+            Row(
+              children: [
+                const Icon(Icons.circle, color: Colors.greenAccent, size: 12),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _viajeActivo!.direccionInicio ??
+                        '${_viajeActivo!.latInicio!.toStringAsFixed(4)}, ${_viajeActivo!.lngInicio!.toStringAsFixed(4)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          if (_viajeActivo!.latInicio != null && _viajeActivo!.latDestino != null)
+            const Padding(
+              padding: EdgeInsets.only(left: 5),
+              child: Icon(Icons.arrow_downward, color: Colors.white38, size: 16),
+            ),
+          if (_viajeActivo!.latInicio != null && _viajeActivo!.latDestino != null)
+            Row(
+              children: [
+                const Icon(Icons.circle, color: Colors.redAccent, size: 12),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _viajeActivo!.direccionDestino ??
+                        '${_viajeActivo!.latDestino!.toStringAsFixed(4)}, ${_viajeActivo!.lngDestino!.toStringAsFixed(4)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Inicio: ${_viajeActivo!.horaInicio != null ? '${_viajeActivo!.horaInicio!.hour}:${_viajeActivo!.horaInicio!.minute.toString().padLeft(2, '0')}' : '--:--'}",
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              Text(
+                "Duración: ${_calcularDuracion(_viajeActivo!.horaInicio)}",
+                style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _calcularDuracion(DateTime? inicio) {
+    if (inicio == null) return '0 min';
+    final duracion = DateTime.now().difference(inicio);
+    final horas = duracion.inHours;
+    final minutos = duracion.inMinutes.remainder(60);
+    if (horas > 0) {
+      return '${horas}h ${minutos}min';
+    }
+    return '${minutos} min';
+  }
+
   Widget _buildBluetoothPanel() {
     return InkWell(
       onTap: () {

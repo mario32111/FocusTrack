@@ -7,7 +7,10 @@ class AuthProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   String? _rolUsuario;
+  String? _idEmpresa;
+
   String? get rolUsuario => _rolUsuario;
+  String? get idEmpresa => _idEmpresa;
 
   User? get usuarioActual => _auth.currentUser;
 
@@ -36,9 +39,11 @@ class AuthProvider extends ChangeNotifier {
         });
 
         _rolUsuario = 'conductor';
+        _idEmpresa = null;
       } else {
         final data = doc.data() as Map<String, dynamic>;
         _rolUsuario = (data['rol'] ?? 'conductor').toString();
+        _idEmpresa = data['id_empresa'];
 
         await _db.collection('usuarios').doc(uid).set({
           'ultimaConexion': FieldValue.serverTimestamp(),
@@ -59,22 +64,28 @@ class AuthProvider extends ChangeNotifier {
   // ========================================================
   // REGISTRO
   // ========================================================
-  Future<bool> registrar(String email, String password) async {
+  Future<bool> registrar(String email, String password, {String? idEmpresa}) async {
     try {
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
       );
 
-      await _db.collection('usuarios').doc(cred.user!.uid).set({
+      final userData = <String, dynamic>{
         'email': email.trim(),
         'rol': 'conductor',
         'score': 100,
         'estado': 'Conducción Segura',
         'ultimaConexion': FieldValue.serverTimestamp(),
-      });
+      };
+      if (idEmpresa != null) {
+        userData['id_empresa'] = idEmpresa;
+      }
+
+      await _db.collection('usuarios').doc(cred.user!.uid).set(userData);
 
       _rolUsuario = 'conductor';
+      _idEmpresa = idEmpresa;
 
       notifyListeners();
       return true;
@@ -90,6 +101,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _auth.signOut();
     _rolUsuario = null;
+    _idEmpresa = null;
     notifyListeners();
   }
 
@@ -106,6 +118,7 @@ class AuthProvider extends ChangeNotifier {
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         _rolUsuario = (data['rol'] ?? 'conductor').toString();
+        _idEmpresa = data['id_empresa'];
         notifyListeners();
       }
     } catch (e) {
