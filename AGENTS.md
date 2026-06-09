@@ -3,11 +3,12 @@
 Este documento contiene el contexto crítico del repositorio para evitar errores comunes y acelerar el desarrollo.
 
 ## Arquitectura del Monorepo
-El proyecto es un monorepo que se divide en tres áreas principales:
+El proyecto es un monorepo que se divide en cuatro áreas principales:
 
 1. **`backend/`**: Microservicios y API principal, orquestados via Docker Compose.
 2. **`ia/`**: Modelos de IA, Notebooks, Datasets y lógica de entrenamiento (YOLO, Scikit-Learn).
 3. **`iot/`**: Código embebido (ESP32 en C++, Raspberry Pi en Python).
+4. **`mobile/`**: Aplicación móvil Flutter (Android/iOS) con Firebase y MQTT.
 
 ## Microservicios del Backend (`backend/`)
 Todos los servicios se orquestan desde `backend/docker-compose.yml`:
@@ -108,6 +109,40 @@ Agentes inteligentes para análisis y respuesta a crisis.
      ```json
      { "tipo": "IMU", "id_viaje": "...", "datos": [{ GyroX, GyroY, GyroZ, AccX, AccY, AccZ }, ...] }
      ```
+
+## Aplicación Móvil (`mobile/`)
+App Flutter multiplataforma (Android/iOS) conectada al backend.
+
+- **Nombre:** focus_track2
+- **SDK:** Flutter ^3.11.0
+- **Plataformas:** Android, iOS, Linux, macOS, Web, Windows
+
+### Dependencias Principales
+| Paquete | Propósito |
+|---------|-----------|
+| `firebase_core` | Inicialización Firebase |
+| `firebase_auth` | Autenticación (matching backend) |
+| `cloud_firestore` | Firestore database |
+| `provider` | State management |
+| `sensors_plus` | Sensores del dispositivo (IMU) |
+| `mqtt_client` | Conexión MQTT (mismo broker que IoT) |
+| `flutter_map` + `latlong2` | Mapas y geolocalización |
+
+### Estructura
+```
+mobile/
+├── lib/           # Código Dart principal
+├── android/       # Configuración Android
+├── ios/           # Configuración iOS
+├── test/          # Tests unitarios
+├── pubspec.yaml   # Dependencias
+└── pubspec.lock   # Versiones lockeadas
+```
+
+### Conexión con Backend
+- **Firebase Auth:** Mismas credenciales que backend usa para `usuariosService.js`
+- **Firestore:** Lee/escribe en las mismas colecciones (`usuarios`, `viajes`, etc.)
+- **MQTT:** Se suscribe a `carro/sensores/#` y publica a `carro/actuadores/#` (mismo broker que ESP32/RPi)
 
 ## Comandos y Ejecución
 - **Docker Compose:** `docker-compose up --build` desde `backend/`

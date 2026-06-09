@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "419951005838",
+    "project_id": "focustrack-cd465",
+    "storage_bucket": "focustrack-cd465.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419951005838:android:8babc65e344c37ec8af9df",
+        "android_client_info": {
+          "package_name": "com.example.ejemplosqlite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJivsfLHzcTG0VpMil1VA7xqfodBSaPVs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419951005838:android:67325e022ec0e4f48af9df",
+        "android_client_info": {
+          "package_name": "com.example.focus_track"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJivsfLHzcTG0VpMil1VA7xqfodBSaPVs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419951005838:android:9815fd82f54656d28af9df",
+        "android_client_info": {
+          "package_name": "com.example.focus_track2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJivsfLHzcTG0VpMil1VA7xqfodBSaPVs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

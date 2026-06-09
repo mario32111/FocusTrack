@@ -98,6 +98,33 @@ imgs/
 *.o
 
 # ==============================================================================
+# MOBILE (Flutter/Dart)
+# ==============================================================================
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+*.iml
+
+# Android build artifacts
+android/app/build/
+android/.gradle/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.framework
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# macOS
+macos/Pods/
+macos/Flutter/GeneratedPluginRegistrant.*
+
+# ==============================================================================
 # MISC / TEMPORALES
 # ==============================================================================
 *.tmp

@@ -41,8 +41,70 @@ unsigned long lastMsg = 0;
 String globalClientId = "";
 String actionTopic = "";
 
-// Pattern pins
+// Pins
 const int VIBRATOR_PIN = 23;
+const int BPM_PIN = 4;
+const int LED_R_PIN = 47;
+const int LED_G_PIN = 48;
+const int LED_B_PIN = 38;
+
+// LEDC channels
+const int LED_R_CH = 0;
+const int LED_G_CH = 1;
+const int LED_B_CH = 2;
+
+// BPM detection
+const int BPM_THRESHOLD = 500;
+const unsigned long MIN_BEAT_INTERVAL_MS = 300;
+const unsigned long MAX_BEAT_INTERVAL_MS = 2000;
+
+int lastBeatValue = 0;
+bool waitingForFall = false;
+unsigned long lastBeatTime = 0;
+int currentBPM = 0;
+
+void setColor(int r, int g, int b) {
+  ledcWrite(LED_R_CH, r);
+  ledcWrite(LED_G_CH, g);
+  ledcWrite(LED_B_CH, b);
+}
+
+void setColorByName(const char* color) {
+  if (strcmp(color, "rojo") == 0) {
+    setColor(255, 0, 0);
+  } else if (strcmp(color, "verde") == 0) {
+    setColor(0, 255, 0);
+  } else if (strcmp(color, "azul") == 0) {
+    setColor(0, 0, 255);
+  } else if (strcmp(color, "amarillo") == 0) {
+    setColor(255, 255, 0);
+  } else if (strcmp(color, "apagar") == 0) {
+    setColor(0, 0, 0);
+  } else {
+    Serial.print("Color desconocido: ");
+    Serial.println(color);
+  }
+}
+
+void detectBeat() {
+  int value = analogRead(BPM_PIN);
+  unsigned long now = millis();
+
+  if (!waitingForFall && value >= BPM_THRESHOLD && lastBeatValue < BPM_THRESHOLD) {
+    unsigned long beatInterval = now - lastBeatTime;
+    if (beatInterval > MIN_BEAT_INTERVAL_MS && beatInterval < MAX_BEAT_INTERVAL_MS) {
+      currentBPM = 60000 / beatInterval;
+    }
+    lastBeatTime = now;
+    waitingForFall = true;
+  }
+
+  if (waitingForFall && value < BPM_THRESHOLD / 2) {
+    waitingForFall = false;
+  }
+
+  lastBeatValue = value;
+}
 
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Mensaje recibido [");
@@ -54,7 +116,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   memcpy(msgBuffer, payload, copyLen);
   msgBuffer[copyLen] = '\0';
 
-  StaticJsonDocument<512> doc;
+  JsonDocument doc;
   DeserializationError err = deserializeJson(doc, msgBuffer, copyLen);
 
   if (err) {
@@ -63,7 +125,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
-  if (!doc.containsKey("accion")) {
+  if (!doc["accion"].is<const char*>()) {
     Serial.println("Mensaje ignorado: sin campo 'accion'");
     return;
   }
@@ -79,12 +141,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print("Actuando: vibrar por ");
     Serial.println(duracion);
     digitalWrite(VIBRATOR_PIN, HIGH);
+    setColor(255, 0, 0);
     delay(duracion);
     digitalWrite(VIBRATOR_PIN, LOW);
+    setColor(0, 255, 0);
   } else if (strcmp(accion, "led") == 0) {
-    Serial.println("Acción LED recibida");
+    const char* color = doc["parametros"]["color"];
+    if (color != nullptr) {
+      Serial.print("LED: ");
+      Serial.println(color);
+      setColorByName(color);
+    } else {
+      Serial.println("LED sin color especificado");
+    }
   } else {
-    Serial.print("Acción desconocida: ");
+    Serial.print("Accion desconocida: ");
     Serial.println(accion);
   }
 }
@@ -104,7 +175,7 @@ void reconnect() {
       globalClientId = "1";
       actionTopic = "carro/actuadores/" + globalClientId;
     }
-    
+
     if (client.connect(globalClientId.c_str(), mqtt_user, mqtt_pass)) {
       Serial.println("MQTT conectado");
       client.subscribe(actionTopic.c_str());
@@ -118,12 +189,30 @@ void reconnect() {
 
 void setup() {
   Serial.begin(115200);
+
+  // Vibrator
   pinMode(VIBRATOR_PIN, OUTPUT);
+  digitalWrite(VIBRATOR_PIN, LOW);
+
+  // RGB LED via LEDC (old API)
+  ledcSetup(LED_R_CH, 5000, 8);
+  ledcSetup(LED_G_CH, 5000, 8);
+  ledcSetup(LED_B_CH, 5000, 8);
+  ledcAttachPin(LED_R_PIN, LED_R_CH);
+  ledcAttachPin(LED_G_PIN, LED_G_CH);
+  ledcAttachPin(LED_B_PIN, LED_B_CH);
+
+  // BPM pin
+  pinMode(BPM_PIN, INPUT);
+
+  // Start with LED blue (standby)
+  setColor(0, 0, 255);
+
+  // WiFi + MQTT
   setup_wifi();
   espClient.setCACert(ca_cert);
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
-  randomSeed(analogRead(0));
 }
 
 void loop() {
@@ -132,17 +221,22 @@ void loop() {
   }
   client.loop();
 
+  detectBeat();
+
   unsigned long now = millis();
   if (now - lastMsg > 5000) {
     lastMsg = now;
 
-    float bpm = random(60, 100);
+    if (currentBPM > 0) {
+      Serial.print("BPM: ");
+      Serial.println(currentBPM);
+    }
 
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     doc["tipo"] = "BPM";
     doc["id_viaje"] = "default";
-    JsonObject datos = doc.createNestedObject("datos");
-    datos["bpm"] = bpm;
+    JsonObject datos = doc["datos"].to<JsonObject>();
+    datos["bpm"] = currentBPM;
 
     char msg[256];
     serializeJson(doc, msg);
