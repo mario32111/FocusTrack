@@ -25,31 +25,44 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Mensaje recibido [");
   Serial.print(topic);
   Serial.print("] ");
-  
-  StaticJsonDocument<200> doc;
-  deserializeJson(doc, payload, length);
-  
-  const char* evento = doc["evento"];
-  Serial.println(evento);
 
-  if (evento != nullptr) {
-    if (strcmp(evento, "MANIOBRA_PELIGROSA") == 0) {
-      Serial.println("Actuando: MANIOBRA_PELIGROSA");
-      // Pattern A
-      digitalWrite(VIBRATOR_PIN, HIGH);
-      delay(500);
-      digitalWrite(VIBRATOR_PIN, LOW);
-      delay(200);
-      digitalWrite(VIBRATOR_PIN, HIGH);
-      delay(500);
-      digitalWrite(VIBRATOR_PIN, LOW);
-    } else if (strcmp(evento, "FATIGA_DETECTADA") == 0) {
-      Serial.println("Actuando: FATIGA_DETECTADA");
-      // Pattern B
-      digitalWrite(VIBRATOR_PIN, HIGH);
-      delay(2000);
-      digitalWrite(VIBRATOR_PIN, LOW);
-    }
+  char msgBuffer[512];
+  unsigned int copyLen = length < sizeof(msgBuffer) - 1 ? length : sizeof(msgBuffer) - 1;
+  memcpy(msgBuffer, payload, copyLen);
+  msgBuffer[copyLen] = '\0';
+
+  StaticJsonDocument<512> doc;
+  DeserializationError err = deserializeJson(doc, msgBuffer, copyLen);
+
+  if (err) {
+    Serial.print("Error parseando JSON: ");
+    Serial.println(err.c_str());
+    return;
+  }
+
+  if (!doc.containsKey("accion")) {
+    Serial.println("Mensaje ignorado: sin campo 'accion'");
+    return;
+  }
+
+  const char* accion = doc["accion"];
+  if (accion == nullptr) {
+    Serial.println("Campo 'accion' nulo");
+    return;
+  }
+
+  if (strcmp(accion, "vibrar") == 0) {
+    int duracion = doc["parametros"]["duracion_ms"] | 500;
+    Serial.print("Actuando: vibrar por ");
+    Serial.println(duracion);
+    digitalWrite(VIBRATOR_PIN, HIGH);
+    delay(duracion);
+    digitalWrite(VIBRATOR_PIN, LOW);
+  } else if (strcmp(accion, "led") == 0) {
+    Serial.println("Acción LED recibida");
+  } else {
+    Serial.print("Acción desconocida: ");
+    Serial.println(accion);
   }
 }
 
@@ -65,8 +78,7 @@ void setup_wifi() {
 void reconnect() {
   while (!client.connected()) {
     if (globalClientId == "") {
-      globalClientId = "ESP32S3-FocusTrack-";
-      globalClientId += String(random(0xffff), HEX);
+      globalClientId = "1";
       actionTopic = "carro/actuadores/" + globalClientId;
     }
     
@@ -98,14 +110,19 @@ void loop() {
   client.loop();
 
   unsigned long now = millis();
-  if (now - lastMsg > 5000) { // Telemetry frequency
+  if (now - lastMsg > 5000) {
     lastMsg = now;
-    
-    // Mock heart rate sensor reading
+
     float bpm = random(60, 100);
-    
-    char msg[100];
-    snprintf(msg, 100, "{\"bpm\": %.1f}", bpm);
+
+    StaticJsonDocument<256> doc;
+    doc["tipo"] = "BPM";
+    doc["id_viaje"] = "default";
+    JsonObject datos = doc.createNestedObject("datos");
+    datos["bpm"] = bpm;
+
+    char msg[256];
+    serializeJson(doc, msg);
     String topic = "carro/sensores/" + globalClientId;
     client.publish(topic.c_str(), msg);
   }
