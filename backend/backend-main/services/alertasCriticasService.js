@@ -37,7 +37,6 @@ const obtenerAlertasPorViaje = async (idViaje) => {
     const snapshot = await db
         .collection(COLLECTION)
         .where('id_viaje', '==', idViaje)
-        .orderBy('timestamp', 'desc')
         .get();
     const alertas = [];
     snapshot.forEach((doc) => {

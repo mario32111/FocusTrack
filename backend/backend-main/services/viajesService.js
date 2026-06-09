@@ -4,6 +4,12 @@ const uploadService = require('./uploadService');
 const COLLECTION = 'viajes';
 const SUB_COLLECTION = 'eventos_viaje';
 
+const API_DETECTION_URL = "http://api_detection:8000";
+const API_AGENTS_URL = "http://api_agents:8000";
+
+const CLASES_RIESGO_IMU = [1, 2, 3, 4];
+const MALOS_HABITOS_IA = ["distraccion", "somnolencia", "comiendo", "sin_cinturon", "fumando"];
+
 // ========================
 // VIAJES (CRUD)
 // ========================
@@ -125,7 +131,6 @@ const eliminarViaje = async (id) => {
  * @returns {Object}              - Evento creado.
  */
 const crearEventoViaje = async (idViaje, data, file = null) => {
-    // Validar que el viaje existe
     const viajeDoc = await db.collection(COLLECTION).doc(idViaje).get();
     if (!viajeDoc.exists) {
         throw new Error('Viaje no encontrado');
@@ -137,35 +142,50 @@ const crearEventoViaje = async (idViaje, data, file = null) => {
     }
 
     let eventoData;
+    let alertaRiesgo = null;
 
     if (tipo === 'IA') {
-        // ---- Procesamiento especial para IA ----
+        let detecciones = [];
+        let pathEvidencia = null;
 
-        // Parsear detecciones (puede venir como JSON string desde FormData)
-        let detecciones;
-        try {
-            detecciones = typeof data.detecciones === 'string'
-                ? JSON.parse(data.detecciones)
-                : data.detecciones;
-        } catch (e) {
-            throw new Error('El campo "detecciones" debe ser un JSON válido con formato: [{ etiqueta, confianza }, ...]');
+        if (file) {
+            pathEvidencia = await uploadService.subirArchivo(file, `evidencias_ia/${idViaje}`);
+
+            try {
+                const { FormData } = await import('undici');
+                const formData = new FormData();
+                const blob = new Blob([file.buffer], { type: file.mimetype });
+                formData.append('evidencia', blob, file.originalname);
+
+                const response = await fetch(`${API_DETECTION_URL}/predict`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const resultado = await response.json();
+                detecciones = resultado.detecciones || [];
+            } catch (error) {
+                console.error(`[VIAJES] Error llamando a api-detection:`, error.message);
+            }
         }
 
-        // Validar estructura
-        if (!Array.isArray(detecciones) || detecciones.length === 0) {
-            throw new Error('Debe incluir al menos una detección en el array "detecciones".');
+        if (file && !detecciones.length) {
+            let deteccionesRaw;
+            try {
+                deteccionesRaw = typeof data.detecciones === 'string'
+                    ? JSON.parse(data.detecciones)
+                    : data.detecciones;
+            } catch (e) {
+                deteccionesRaw = [];
+            }
+            if (Array.isArray(deteccionesRaw) && deteccionesRaw.length > 0) {
+                detecciones = deteccionesRaw;
+            }
         }
 
         for (const det of detecciones) {
             if (!det.etiqueta || det.confianza === undefined) {
                 throw new Error('Cada detección debe tener "etiqueta" (string) y "confianza" (float).');
             }
-        }
-
-        // Subir imagen de evidencia a Firebase Storage
-        let pathEvidencia = null;
-        if (file) {
-            pathEvidencia = await uploadService.subirArchivo(file, `evidencias_ia/${idViaje}`);
         }
 
         eventoData = {
@@ -179,10 +199,20 @@ const crearEventoViaje = async (idViaje, data, file = null) => {
                 path_evidencia: pathEvidencia,
             },
         };
-    } else {
-        // ---- IMU, BPM u otros tipos ----
 
-        // Si datos viene como string (FormData), parsearlo
+        const hayMalHabito = detecciones.some(d => MALOS_HABITOS_IA.includes(d.etiqueta));
+        if (hayMalHabito) {
+            const habitosDetectados = detecciones
+                .filter(d => MALOS_HABITOS_IA.includes(d.etiqueta))
+                .map(d => d.etiqueta);
+            alertaRiesgo = {
+                tipo_alerta: 'IA',
+                nivel_riesgo: 'alto',
+                descripcion: `Mal hábito detectado: ${habitosDetectados.join(', ')}`,
+            };
+        }
+
+    } else {
         let datos;
         try {
             datos = typeof data.datos === 'string'
@@ -197,6 +227,17 @@ const crearEventoViaje = async (idViaje, data, file = null) => {
             tipo: tipo,
             datos: datos,
         };
+
+        if (tipo === 'IMU' && datos.analisis) {
+            const claseManiobra = datos.analisis.clase;
+            if (CLASES_RIESGO_IMU.includes(claseManiobra)) {
+                alertaRiesgo = {
+                    tipo_alerta: 'IMU',
+                    nivel_riesgo: 'alto',
+                    descripcion: `Maniobra de riesgo detectada: ${datos.analisis.maniobra} (confianza: ${datos.analisis.confianza}%)`,
+                };
+            }
+        }
     }
 
     const docRef = await db
@@ -204,6 +245,25 @@ const crearEventoViaje = async (idViaje, data, file = null) => {
         .doc(idViaje)
         .collection(SUB_COLLECTION)
         .add(eventoData);
+
+    if (alertaRiesgo) {
+        try {
+            await fetch(`${API_AGENTS_URL}/agent/crisis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id_alerta: `alerta_${Date.now()}`,
+                    id_viaje: idViaje,
+                    tipo_alerta: alertaRiesgo.tipo_alerta,
+                    nivel_riesgo: alertaRiesgo.nivel_riesgo,
+                    descripcion: alertaRiesgo.descripcion,
+                }),
+            });
+            console.log(`[VIAJES] Alerta de riesgo enviada al agente de crisis para viaje ${idViaje}`);
+        } catch (error) {
+            console.error(`[VIAJES] Error notificando agente de crisis:`, error.message);
+        }
+    }
 
     return { id_evento: docRef.id, id_viaje: idViaje, ...eventoData };
 };
@@ -235,7 +295,6 @@ const obtenerEventosPorTipo = async (idViaje, tipo) => {
         .doc(idViaje)
         .collection(SUB_COLLECTION)
         .where('tipo', '==', tipo)
-        .orderBy('timestamp', 'asc')
         .get();
 
     const eventos = [];
