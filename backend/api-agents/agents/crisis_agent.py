@@ -31,18 +31,18 @@ def evaluate_crisis(alert_data):
     if not viaje:
         raise ValueError(f"Viaje {id_viaje} no encontrado")
         
-    driver = get_conductor(viaje.get("id_conductor"))
-    detections = get_detecciones_ia(id_viaje)
-    alerts = get_alertas_viaje(id_viaje)
-    heart_rate = get_bpm(id_viaje)
+    driver = get_conductor(viaje.get("id_conductor")) or {}
+    detections = get_detecciones_ia(id_viaje) or []
+    alerts = get_alertas_viaje(id_viaje) or []
+    heart_rate = get_bpm(id_viaje) or []
     
-    # Obtener id_dispositivo (asumiendo que está en el conductor)
     id_dispositivo = driver.get("id_dispositivo", "ESP32_DEFAULT")
 
     # Procesar datos para el contexto...
     context = f"""ALERTA CRÍTICA: {alert_data.get('descripcion')}
 Viaje: {id_viaje}
 Conductor: {driver.get('nombre_completo', 'Desconocido')}
+Dispositivo IoT: {id_dispositivo}
 Riesgo: {viaje.get('score_final_viaje')}"""
 
     # Agentes (Evaluador, Logistica, Comunicador)
@@ -66,8 +66,8 @@ Al terminar, responde TERMINAR.""",
         is_termination_msg=lambda msg: "TERMINAR" in (msg.get("content") or "").upper(),
     )
 
-    register_function(activar_vibrador, caller=assistant, executor=user_proxy, name="activar_vibrador")
-    register_function(activar_led, caller=assistant, executor=user_proxy, name="activar_led")
+    register_function(activar_vibrador, caller=assistant, executor=user_proxy, name="activar_vibrador", description="Activa el vibrador del dispositivo IoT")
+    register_function(activar_led, caller=assistant, executor=user_proxy, name="activar_led", description="Cambia el color del LED RGB del dispositivo IoT")
 
     # Ejecutar crisis
     response = user_proxy.initiate_chat(assistant, message=context, max_turns=5)
