@@ -14,6 +14,29 @@ const char* mqtt_pass = "admin123";
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
+// CA Certificate for MQTT TLS
+const char* ca_cert = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIDDzCCAfegAwIBAgIUAzvqlkGDMzBmjHRGeRCb1AuAxPkwDQYJKoZIhvcNAQEL
+BQAwFzEVMBMGA1UEAwwMRm9jdXNUcmFja0NBMB4XDTI2MDUwMTAyNTY0NFoXDTM2
+MDQyODAyNTY0NFowFzEVMBMGA1UEAwwMRm9jdXNUcmFja0NBMIIBIjANBgkqhkiG
+9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtLrOKSaZanbAEzmFTdx8RO9pGoKGh2izZJMQ
+UIUZY+sX+4jKCPhhncN38Bcd/gCJwCwsRv7EK5v0Wmu1ONmVVntSqOB2hvz9Rvy7
+/iO2uQbyG/Pt4/UBy/0ElFLQwh/o4keyRcHI7WkyG7VC3I/vh0gc9bskxbh9DQTb
+k/JeP7RDl7Fv7FdwdUeuTCpEKndbvwKB5RN/LpJDzofVmRzJeTD8Z8Y6UuL9HtIx
+V7y5u3UrxllV4U9C34ju2XXD+x7hfeQyoigO7Xa58YYhLP2ET6algPvIlEhc3H/V
+DKO5fXvi1+uDPFyeL1PXllk3YRHCzMJTSx79mJSlDe8Yagwl2wIDAQABo1MwUTAd
+BgNVHQ4EFgQUbNFR4MBW8Fi424OEfqRUzg4iR/kwHwYDVR0jBBgwFoAUbNFR4MBW
+8Fi424OEfqRUzg4iR/kwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOC
+AQEAGX0NpS0hpiGHVLGKYB6xggsesBykV99DizsrC1ctWvyHle30fK/fWJb9owvV
+8uZEYxUJ/YV8rKPczbiLbpe3j3+sgHTpBnPjUvvme5naX9LzaZeBMHN8WubtCM2M
+QStmaLThMKsm43Y2zBTAAwTy4s3XH5M1Wc/9s3uch3BQhwLfH79XpdNsRduaAoFA
+D+JuvCY7SmHSXKwwE/A/5qudX3F3Rrq+TJGMOUBrPsJChYVMnZj17dypfnJICIaf
+el9IpNAgBKNRcWeP0tBJUjnnb1YTYz7yLYvAmS2sbJCp9U8/66yphom6mdug9kDO
+QLB7ifz2DcS1ReqJvaCTSyU5LA==
+-----END CERTIFICATE-----
+)EOF";
+
 unsigned long lastMsg = 0;
 String globalClientId = "";
 String actionTopic = "";
@@ -97,7 +120,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(VIBRATOR_PIN, OUTPUT);
   setup_wifi();
-  espClient.setInsecure();
+  espClient.setCACert(ca_cert);
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
   randomSeed(analogRead(0));
